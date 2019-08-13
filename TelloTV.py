@@ -275,8 +275,8 @@ class FrontEnd(object):
             face_locations = face_recognition.face_locations(rgb_recognition_frame)
             face_encodings = face_recognition.face_encodings(rgb_recognition_frame, face_locations)
             
-            tolerance_x = 50
-            tolerance_y = 50
+            tolerance_x = 100
+            tolerance_y = 100
 
             noFaces = len(face_encodings) == 0
 
@@ -338,54 +338,27 @@ class FrontEnd(object):
                             frameRet,
                             (heading_point_x, heading_point_y),
                             5, (0, 0, 255), 2)
+                        
+                        target_reached = heading_point_x >= (target_point_x - tolerance_x) \
+                                            and heading_point_x <= (target_point_x + tolerance_x) \
+                                            and heading_point_y >= (target_point_y - tolerance_y) \
+                                            and heading_point_y <= (target_point_y + tolerance_y)
 
                         # Draw the target zone
                         cv2.rectangle(
                             frameRet,
                             (target_point_x - tolerance_x, target_point_y - tolerance_y),
                             (target_point_x + tolerance_x, target_point_y + tolerance_y),
-                            (0, 255, 255), 2)
-
+                            (0, 255, 0) if target_reached else (0, 255, 255), 2)
                         
-                        
-                        
-                        
+                        if not target_reached:
+                            target_offset_x = target_point_x - heading_point_x
+                            target_offset_y = target_point_y - heading_point_y
                             
-
-
-
-                        # not long needed 
-                        # if not args.debug:
-                        #     # for turning
-                        #     if vDistance[0] < -szX:
-                        #         self.yaw_velocity = S
-                        #         # self.left_right_velocity = S2
-                        #     elif vDistance[0] > szX:
-                        #         self.yaw_velocity = -S
-                        #         # self.left_right_velocity = -S2
-                        #     else:
-                        #         self.yaw_velocity = 0
+                            self.yaw_velocity = round(S * translate(target_offset_x, -dimensions[0]/2, dimensions[0] / 2, -1, 1))
+                            self.up_down_velocity = -round(S * translate(target_offset_y, -dimensions[1]/2, dimensions[1] / 2, -1, 1))
                             
-                        #     # for up & down
-                        #     if vDistance[1] > szY:
-                        #         self.up_down_velocity = S
-                        #     elif vDistance[1] < -szY:
-                        #         self.up_down_velocity = -S
-                        #     else:
-                        #         self.up_down_velocity = 0
-
-                        #     F = 0
-                        #     if abs(vDistance[2]) > acc[tDistance]:
-                        #         F = S
-
-                        #     # for forward back
-                        #     if vDistance[2] > 0:
-                        #         self.for_back_velocity = S + F
-                        #     elif vDistance[2] < 0:
-                        #         self.for_back_velocity = -S - F
-                        #     else:
-                        #         self.for_back_velocity = 0
-                        
+                            print("YAW SPEED {} UD SPEED {}".format(self.yaw_velocity, self.up_down_velocity))
                 if noFaces:
                     self.yaw_velocity = 0
                     self.up_down_velocity = 0
@@ -416,6 +389,17 @@ class FrontEnd(object):
 
 def lerp(a,b,c):
     return a + c*(b-a)
+
+def translate(value, leftMin, leftMax, rightMin, rightMax):
+    # Figure out how 'wide' each range is
+    leftSpan = leftMax - leftMin
+    rightSpan = rightMax - rightMin
+
+    # Convert the left range into a 0-1 range (float)
+    valueScaled = float(value - leftMin) / float(leftSpan)
+
+    # Convert the 0-1 range into a value in the right range.
+    return rightMin + (valueScaled * rightSpan)
 
 def main():
     frontend = FrontEnd()
