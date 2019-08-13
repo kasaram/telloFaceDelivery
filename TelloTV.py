@@ -1,3 +1,6 @@
+# Face Tracking Delivery Project
+# Based on Jabrils TelloTV Project
+
 from djitellopy import Tello
 import cv2
 import numpy as np
@@ -213,32 +216,32 @@ class FrontEnd(object):
                 else:
                     self.for_back_velocity = 0
 
-                # a & d to pan left & right
-                if k == ord('d'):
+                # a & d to pan right & left
+                if k == ord('e'):
                     self.yaw_velocity = int(S * oSpeed)
-                elif k == ord('a'):
+                elif k == ord('q'):
                     self.yaw_velocity = -int(S * oSpeed)
                 else:
                     self.yaw_velocity = 0
 
                 # Q & E to fly up & down
-                if k == ord('e'):
+                if k == 304: #left shift
                     self.up_down_velocity = int(S * oSpeed)
-                elif k == ord('q'):
+                elif k == 32: #space
                     self.up_down_velocity = -int(S * oSpeed)
                 else:
                     self.up_down_velocity = 0
 
-                # c & z to fly left & right
-                if k == ord('c'):
+                # c & z to fly right & left
+                if k == ord('d'):
                     self.left_right_velocity = int(S * oSpeed)
-                elif k == ord('z'):
+                elif k == ord('a'):
                     self.left_right_velocity = -int(S * oSpeed)
                 else:
                     self.left_right_velocity = 0
 
             # Quit the software
-            if k == 27:
+            if k == 27: #escape key
                 should_stop = True
                 break
 
