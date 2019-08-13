@@ -208,15 +208,15 @@ class FrontEnd(object):
                     print("OVERRIDE DISABLED")
 
             if OVERRIDE:
-                # S & W to fly forward & back
-                if k == ord('w'):
+                # W & S to fly forward & back
+                if k == ord('s'):
                     self.for_back_velocity = int(S * oSpeed)
-                elif k == ord('s'):
+                elif k == ord('w'):
                     self.for_back_velocity = -int(S * oSpeed)
                 else:
                     self.for_back_velocity = 0
 
-                # a & d to pan right & left
+                # e & q to pan right & left
                 if k == ord('e'):
                     self.yaw_velocity = int(S * oSpeed)
                 elif k == ord('q'):
@@ -224,10 +224,10 @@ class FrontEnd(object):
                 else:
                     self.yaw_velocity = 0
 
-                # Q & E to fly up & down
-                if k == 304: #left shift
+                # space & y to fly up & down
+                if k == 32: #space
                     self.up_down_velocity = int(S * oSpeed)
-                elif k == 32: #space
+                elif k == ord('y'):
                     self.up_down_velocity = -int(S * oSpeed)
                 else:
                     self.up_down_velocity = 0
