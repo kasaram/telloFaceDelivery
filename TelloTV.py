@@ -30,9 +30,8 @@ parser.add_argument('-D', "--debug", action='store_true',
 args = parser.parse_args()
 
 # Speed of the drone
-S = 30
-S2 = 5
-UDOffset = 150
+S = 20
+
 
 # this is just the bound box sizes that openCV spits out *shrug*
 faceSizes = [1026, 684, 456, 304, 202, 136, 90]
