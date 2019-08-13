@@ -22,12 +22,17 @@ dimensions = (960, 720)
 dario_image = face_recognition.load_image_file("known_faces/dario.png")
 dario_face_encoding = face_recognition.face_encodings(dario_image)[0]
 
+luca_image = face_recognition.load_image_file("known_faces/luca.png")
+luca_face_encoding = face_recognition.face_encodings(luca_image)[0]
+
 # Create arrays of known face encodings and their names
 known_face_encodings = [
     dario_face_encoding,
+    luca_face_encoding
 ]
 known_face_names = [
     "Dario",
+    "Luca"
 ]
 
 class FrontEnd(object):
@@ -150,10 +155,13 @@ class FrontEnd(object):
 
             # Resize the frame
             capture_divider = 0.5
-            rgb_recognition_frame = cv2.resize(frameRet, (0, 0), fx=capture_divider, fy=capture_divider)
+            recognition_frame = cv2.resize(frameRet, (0, 0), fx=capture_divider, fy=capture_divider) #BGR is used, not RGB
             
-            face_locations = face_recognition.face_locations(rgb_recognition_frame)
-            face_encodings = face_recognition.face_encodings(rgb_recognition_frame, face_locations)
+            # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+            # rgb_small_frame = bgr_recognition_frame[:, :, ::-1]
+            
+            face_locations = face_recognition.face_locations(recognition_frame)
+            face_encodings = face_recognition.face_encodings(recognition_frame, face_locations)
             
             tolerance_x = 50
             tolerance_y = 50
