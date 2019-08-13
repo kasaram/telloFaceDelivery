@@ -1,5 +1,6 @@
 # Face Tracking Delivery Project
 # Based on Jabrils TelloTV Project
+# Extended / reworked by Luca Fluri & Dario Breitenstein
 
 from djitellopy import Tello
 import face_recognition
@@ -8,74 +9,26 @@ import numpy as np
 import time
 import datetime
 import os
-import argparse
-
-# standard argparse stuff
-parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, add_help=False)
-parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
-                    help='** = required')
-parser.add_argument('-d', '--distance', type=int, default=3,
-    help='use -d to change the distance of the drone. Range 0-6')
-parser.add_argument('-sx', '--saftey_x', type=int, default=100,
-    help='use -sx to change the saftey bound on the x axis . Range 0-480')
-parser.add_argument('-sy', '--saftey_y', type=int, default=55,
-    help='use -sy to change the saftey bound on the y axis . Range 0-360')
-parser.add_argument('-os', '--override_speed', type=int, default=1,
-    help='use -os to change override speed. Range 0-3')
-parser.add_argument('-ss', "--save_session", action='store_true',
-    help='add the -ss flag to save your session as an image sequence in the Sessions folder')
-parser.add_argument('-D', "--debug", action='store_true',
-    help='add the -D flag to enable debug mode. Everything works the same, but no commands will be sent to the drone')
-
-args = parser.parse_args()
 
 # Speed of the drone
-S = 20
+v_yaw_pitch = 100
 v_for_back = 15
-
-# this is just the bound box sizes that openCV spits out *shrug*
-faceSizes = [1026, 684, 456, 304, 202, 136, 90]
-
-# These are the values in which kicks in speed up mode, as of now, this hasn't been finalized or fine tuned so be careful
-# Tested are 3, 4, 5
-acc = [500,250,250,150,110,70,50]
 
 # Frames per second of the pygame window display
 FPS = 25
 dimensions = (960, 720)
 
-# 
-# face_cascade = cv2.CascadeClassifier('cascades/data/haarcascade_frontalface_alt2.xml')
-# recognizer = cv2.face.LBPHFaceRecognizer_create()
-
 # Face Recognition
-
 dario_image = face_recognition.load_image_file("known_faces/dario.png")
 dario_face_encoding = face_recognition.face_encodings(dario_image)[0]
-
-luca_image = face_recognition.load_image_file("known_faces/luca.png")
-luca_face_encoding = face_recognition.face_encodings(dario_image)[0]
-
 
 # Create arrays of known face encodings and their names
 known_face_encodings = [
     dario_face_encoding,
-    luca_face_encoding
 ]
 known_face_names = [
     "Dario",
-    "Luca"
 ]
-
-# If we are to save our sessions, we need to make sure the proper directories exist
-if args.save_session:
-    ddir = "Sessions"
-
-    if not os.path.isdir(ddir):
-        os.mkdir(ddir)
-
-    ddir = "Sessions/Session {}".format(str(datetime.datetime.now()).replace(':','-').replace('.','_'))
-    os.mkdir(ddir)
 
 class FrontEnd(object):
     
@@ -89,8 +42,6 @@ class FrontEnd(object):
         self.up_down_velocity = 0
         self.yaw_velocity = 0
         self.speed = 10
-
-        self.send_rc_control = True
 
     def run(self):
 
@@ -116,18 +67,8 @@ class FrontEnd(object):
         should_stop = False
         imgCount = 0
         OVERRIDE = False
-        oSpeed = args.override_speed
-        tDistance = args.distance
-        self.tello.get_battery()
-        
-        # Safety Zone X
-        szX = args.saftey_x
 
-        # Safety Zone Y
-        szY = args.saftey_y
-        
-        if args.debug:
-            print("DEBUG MODE ENABLED!")
+        self.tello.get_battery()
 
         while not should_stop:
             self.update()
@@ -136,71 +77,16 @@ class FrontEnd(object):
                 frame_read.stop()
                 break
 
-            theTime = str(datetime.datetime.now()).replace(':','-').replace('.','_')
-
             frame = cv2.cvtColor(frame_read.frame, cv2.COLOR_BGR2RGB)
             frameRet = frame_read.frame
 
             vid = self.tello.get_video_capture()
 
-            if args.save_session:
-                cv2.imwrite("{}/tellocap{}.jpg".format(ddir,imgCount),frameRet)
-            
             frame = np.rot90(frame)
-            imgCount+=1
-
             time.sleep(1 / FPS)
 
             # Listen for key presses
             k = cv2.waitKey(20)
-
-            # Press 0 to set distance to 0
-            if k == ord('0'):
-                if not OVERRIDE:
-                    print("Distance = 0")
-                    tDistance = 0
-
-            # Press 1 to set distance to 1
-            if k == ord('1'):
-                if OVERRIDE:
-                    oSpeed = 1
-                else:
-                    print("Distance = 1")
-                    tDistance = 1
-
-            # Press 2 to set distance to 2
-            if k == ord('2'):
-                if OVERRIDE:
-                    oSpeed = 2
-                else:
-                    print("Distance = 2")
-                    tDistance = 2
-                    
-            # Press 3 to set distance to 3
-            if k == ord('3'):
-                if OVERRIDE:
-                    oSpeed = 3
-                else:
-                    print("Distance = 3")
-                    tDistance = 3
-            
-            # Press 4 to set distance to 4
-            if k == ord('4'):
-                if not OVERRIDE:
-                    print("Distance = 4")
-                    tDistance = 4
-                    
-            # Press 5 to set distance to 5
-            if k == ord('5'):
-                if not OVERRIDE:
-                    print("Distance = 5")
-                    tDistance = 5
-                    
-            # Press 6 to set distance to 6
-            if k == ord('6'):
-                if not OVERRIDE:
-                    print("Distance = 6")
-                    tDistance = 6
 
             # Press T to take off
             if k == ord('t'):
@@ -208,14 +94,12 @@ class FrontEnd(object):
                     print("Taking Off")
                     self.tello.takeoff()
                     self.tello.get_battery()
-                self.send_rc_control = True
 
             # Press L to land
             if k == ord('l'):
                 if not args.debug:
                     print("Landing")
                     self.tello.land()
-                self.send_rc_control = False
 
             # Press Backspace for controls override
             if k == 8:
@@ -229,60 +113,54 @@ class FrontEnd(object):
             if OVERRIDE:
                 # W & S to fly forward & back
                 if k == ord('s'):
-                    self.for_back_velocity = int(S * oSpeed)
+                    self.for_back_velocity = v_for_back
                 elif k == ord('w'):
-                    self.for_back_velocity = -int(S * oSpeed)
+                    self.for_back_velocity = -v_for_back
                 else:
                     self.for_back_velocity = 0
 
                 # e & q to pan right & left
                 if k == ord('e'):
-                    self.yaw_velocity = int(S * oSpeed)
+                    self.yaw_velocity = v_yaw_pitch
                 elif k == ord('q'):
-                    self.yaw_velocity = -int(S * oSpeed)
+                    self.yaw_velocity = -v_yaw_pitch
                 else:
                     self.yaw_velocity = 0
 
                 # space & y to fly up & down
                 if k == 32: #space
-                    self.up_down_velocity = int(S * oSpeed)
+                    self.up_down_velocity = v_yaw_pitch
                 elif k == ord('y'):
-                    self.up_down_velocity = -int(S * oSpeed)
+                    self.up_down_velocity = -v_yaw_pitch
                 else:
                     self.up_down_velocity = 0
 
                 # c & z to fly right & left
                 if k == ord('d'):
-                    self.left_right_velocity = int(S * oSpeed)
+                    self.left_right_velocity = v_for_back
                 elif k == ord('a'):
-                    self.left_right_velocity = -int(S * oSpeed)
+                    self.left_right_velocity = -v_for_back
                 else:
                     self.left_right_velocity = 0
 
             # Quit the software
-            if k == 27: #escape key
+            if k == 27: # escape key
                 should_stop = True
                 break
 
-            #gray  = cv2.cvtColor(frameRet, cv2.COLOR_BGR2GRAY)
-            #faces = face_cascade.detectMultiScale(gray, scaleFactor=1.5, minNeighbors=2)
-            
-            # Resize the frame to 1/4 the size
-            recognition_frame = cv2.resize(frameRet, (0, 0), fx=0.25, fy=0.25)
-            # Convert the video frame from GRB (opencv) to RGB (face_recognition) color
-            rgb_recognition_frame = recognition_frame[:, :, ::-1] 
+            # Resize the frame
+            capture_divider = 0.5
+            rgb_recognition_frame = cv2.resize(frameRet, (0, 0), fx=capture_divider, fy=capture_divider)
             
             face_locations = face_recognition.face_locations(rgb_recognition_frame)
             face_encodings = face_recognition.face_encodings(rgb_recognition_frame, face_locations)
             
-            tolerance_x = 100
-            tolerance_y = 100
+            tolerance_x = 50
+            tolerance_y = 50
             depth_box_size = 150
             depth_tolerance = 50
 
-            noFaces = len(face_encodings) == 0
-
-            if self.send_rc_control and not OVERRIDE:
+            if not OVERRIDE:
                 face_names = []
                 for face_encoding in face_encodings:
                     # See if the face is a match for the known face(s)
@@ -293,17 +171,17 @@ class FrontEnd(object):
                     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
                     best_match_index = np.argmin(face_distances)
                     if matches[best_match_index]:
-                        name = known_face_names[best_match_index]
+                        name = known_face_names[best_match_index] 
         
                     face_names.append(name)
                 
                 face_locked = False
                 for (top, right, bottom, left), name in zip(face_locations, face_names):
                     # Scale back up face locations since the frame we detected in was scaled to 1/4 size
-                    top *= 4
-                    right *= 4
-                    bottom *= 4
-                    left *= 4
+                    top = int(top * 1/capture_divider)
+                    right = int(right * 1/capture_divider)
+                    bottom = int(bottom * 1/capture_divider)
+                    left = int(left * 1/capture_divider)
             
                     # Draw a box around the face
                     cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
@@ -370,24 +248,21 @@ class FrontEnd(object):
                             target_offset_x = target_point_x - heading_point_x
                             target_offset_y = target_point_y - heading_point_y
                             
-                            self.yaw_velocity = round(S * translate(target_offset_x, -dimensions[0]/2, dimensions[0] / 2, -1, 1))
-                            self.up_down_velocity = -round(S * translate(target_offset_y, -dimensions[1]/2, dimensions[1] / 2, -1, 1))
-                            
+                            self.yaw_velocity = round(v_yaw_pitch * map_values(target_offset_x, -dimensions[0], dimensions[0], -1, 1))
+                            self.up_down_velocity = -round(v_yaw_pitch * map_values(target_offset_y, -dimensions[1], dimensions[1], -1, 1))
                             print("YAW SPEED {} UD SPEED {}".format(self.yaw_velocity, self.up_down_velocity))
-                        else:
-                            self.yaw_velocity = 0
-                            self.up_down_velocity = 0
 
                         if not close_enough:
-                            depth_offset = (right -left) - depth_box_size * 2
-                            if depth_offset < depth_box_size * 2 and not target_reached:
+                            depth_offset = (right - left) - depth_box_size * 2
+                            if (right - left) > depth_box_size * 1.5 and not target_reached:
                                 self.for_back_velocity = 0
                             else:
-                                self.for_back_velocity = -round(v_for_back * translate(depth_offset, -depth_box_size, depth_box_size, -1, 1))
+                                self.for_back_velocity = -round(v_for_back * map_values(depth_offset, -depth_box_size, depth_box_size, -1, 1))
                         else:
                             self.for_back_velocity = 0
-
-                if noFaces:
+  
+                # No Faces
+                if len(face_encodings) == 0:
                     self.yaw_velocity = 0
                     self.up_down_velocity = 0
                     self.for_back_velocity = 0
@@ -405,20 +280,18 @@ class FrontEnd(object):
         # Call it always before finishing. I deallocate resources.
         self.tello.end()
 
-
     def battery(self):
         return self.tello.get_battery()[:2]
 
     def update(self):
         """ Update routine. Send velocities to Tello."""
-        if self.send_rc_control:
-            self.tello.send_rc_control(self.left_right_velocity, self.for_back_velocity, self.up_down_velocity,
-                                       self.yaw_velocity)
+        self.tello.send_rc_control(self.left_right_velocity, self.for_back_velocity, self.up_down_velocity,
+                                    self.yaw_velocity)
 
 def lerp(a,b,c):
     return a + c*(b-a)
 
-def translate(value, leftMin, leftMax, rightMin, rightMax):
+def map_values(value, leftMin, leftMax, rightMin, rightMax):
     # Figure out how 'wide' each range is
     leftSpan = leftMax - leftMin
     rightSpan = rightMax - rightMin
