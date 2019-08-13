@@ -2,6 +2,7 @@
 # Based on Jabrils TelloTV Project
 
 from djitellopy import Tello
+import face_recognition
 import cv2
 import numpy as np
 import time
@@ -45,8 +46,27 @@ FPS = 25
 dimensions = (960, 720)
 
 # 
-face_cascade = cv2.CascadeClassifier('cascades/data/haarcascade_frontalface_alt2.xml')
-recognizer = cv2.face.LBPHFaceRecognizer_create()
+# face_cascade = cv2.CascadeClassifier('cascades/data/haarcascade_frontalface_alt2.xml')
+# recognizer = cv2.face.LBPHFaceRecognizer_create()
+
+# Face Recognition
+
+dario_image = face_recognition.load_image_file("known_faces/dario.png")
+dario_face_encoding = face_recognition.face_encodings(dario_image)[0]
+
+luca_image = face_recognition.load_image_file("known_faces/luca.png")
+luca_face_encoding = face_recognition.face_encodings(dario_image)[0]
+
+
+# Create arrays of known face encodings and their names
+known_face_encodings = [
+    dario_face_encoding,
+    luca_face_encoding
+]
+known_face_names = [
+    "Dario",
+    "Luca"
+]
 
 # If we are to save our sessions, we need to make sure the proper directories exist
 if args.save_session:
@@ -71,7 +91,7 @@ class FrontEnd(object):
         self.yaw_velocity = 0
         self.speed = 10
 
-        self.send_rc_control = False
+        self.send_rc_control = True
 
     def run(self):
 
@@ -245,8 +265,13 @@ class FrontEnd(object):
                 should_stop = True
                 break
 
-            gray  = cv2.cvtColor(frameRet, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.5, minNeighbors=2)
+            #gray  = cv2.cvtColor(frameRet, cv2.COLOR_BGR2GRAY)
+            #faces = face_cascade.detectMultiScale(gray, scaleFactor=1.5, minNeighbors=2)
+            recognition_frame = cv2.resize(frameRet, (0, 0), fx=0.25, fy=0.25)
+            rgb_recognition_frame = recognition_frame[:, :, ::-1]
+            
+            face_locations = face_recognition.face_locations(rgb_recognition_frame)
+            face_encodings = face_recognition.face_encodings(rgb_recognition_frame, face_locations)
 
             # Target size
             tSize = faceSizes[tDistance]
@@ -255,84 +280,114 @@ class FrontEnd(object):
             cWidth = int(dimensions[0]/2)
             cHeight = int(dimensions[1]/2)
 
-            noFaces = len(faces) == 0
+            noFaces = len(face_encodings) == 0
 
-            # if we've given rc controls & get face coords returned
             if self.send_rc_control and not OVERRIDE:
-                for (x, y, w, h) in faces:
+                face_names = []
+                for face_encoding in face_encodings:
+                    # See if the face is a match for the known face(s)
+                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                    name = "Unknown"
+        
+                    # Use the known face with the smallest distance to the new face
+                    face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                    best_match_index = np.argmin(face_distances)
+                    if matches[best_match_index]:
+                        name = known_face_names[best_match_index]
+        
+                    face_names.append(name)
 
-                    # 
-                    roi_gray = gray[y:y+h, x:x+w] #(ycord_start, ycord_end)
-                    roi_color = frameRet[y:y+h, x:x+w]
+                for (top, right, bottom, left), name in zip(face_locations, face_names):
+                    # Scale back up face locations since the frame we detected in was scaled to 1/4 size
+                    top *= 4
+                    right *= 4
+                    bottom *= 4
+                    left *= 4
+            
+                    # Draw a box around the face
+                    cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
+            
+                    # Draw a label with a name below the face
+                    cv2.rectangle(frameRet, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                    font = cv2.FONT_HERSHEY_DUPLEX
+                    cv2.putText(frameRet, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
-                    # setting Face Box properties
-                    fbCol = (255, 0, 0) #BGR 0-255 
-                    fbStroke = 2
+            # # if we've given rc controls & get face coords returned
+            # if self.send_rc_control and not OVERRIDE:
+            #     for (x, y, w, h) in faces:
+
+            #         # 
+            #         roi_gray = gray[y:y+h, x:x+w] #(ycord_start, ycord_end)
+            #         roi_color = frameRet[y:y+h, x:x+w]
+
+            #         # setting Face Box properties
+            #         fbCol = (255, 0, 0) #BGR 0-255 
+            #         fbStroke = 2
                     
-                    # end coords are the end of the bounding box x & y
-                    end_cord_x = x + w
-                    end_cord_y = y + h
-                    end_size = w*2
+            #         # end coords are the end of the bounding box x & y
+            #         end_cord_x = x + w
+            #         end_cord_y = y + h
+            #         end_size = w*2
 
-                    # these are our target coordinates
-                    targ_cord_x = int((end_cord_x + x)/2)
-                    targ_cord_y = int((end_cord_y + y)/2) + UDOffset
+            #         # these are our target coordinates
+            #         targ_cord_x = int((end_cord_x + x)/2)
+            #         targ_cord_y = int((end_cord_y + y)/2) + UDOffset
 
-                    # This calculates the vector from your face to the center of the screen
-                    vTrue = np.array((cWidth,cHeight,tSize))
-                    vTarget = np.array((targ_cord_x,targ_cord_y,end_size))
-                    vDistance = vTrue-vTarget
+            #         # This calculates the vector from your face to the center of the screen
+            #         vTrue = np.array((cWidth,cHeight,tSize))
+            #         vTarget = np.array((targ_cord_x,targ_cord_y,end_size))
+            #         vDistance = vTrue-vTarget
 
-                    # 
-                    if not args.debug:
-                        # for turning
-                        if vDistance[0] < -szX:
-                            self.yaw_velocity = S
-                            # self.left_right_velocity = S2
-                        elif vDistance[0] > szX:
-                            self.yaw_velocity = -S
-                            # self.left_right_velocity = -S2
-                        else:
-                            self.yaw_velocity = 0
+            #         # 
+            #         if not args.debug:
+            #             # for turning
+            #             if vDistance[0] < -szX:
+            #                 self.yaw_velocity = S
+            #                 # self.left_right_velocity = S2
+            #             elif vDistance[0] > szX:
+            #                 self.yaw_velocity = -S
+            #                 # self.left_right_velocity = -S2
+            #             else:
+            #                 self.yaw_velocity = 0
                         
-                        # for up & down
-                        if vDistance[1] > szY:
-                            self.up_down_velocity = S
-                        elif vDistance[1] < -szY:
-                            self.up_down_velocity = -S
-                        else:
-                            self.up_down_velocity = 0
+            #             # for up & down
+            #             if vDistance[1] > szY:
+            #                 self.up_down_velocity = S
+            #             elif vDistance[1] < -szY:
+            #                 self.up_down_velocity = -S
+            #             else:
+            #                 self.up_down_velocity = 0
 
-                        F = 0
-                        if abs(vDistance[2]) > acc[tDistance]:
-                            F = S
+            #             F = 0
+            #             if abs(vDistance[2]) > acc[tDistance]:
+            #                 F = S
 
-                        # for forward back
-                        if vDistance[2] > 0:
-                            self.for_back_velocity = S + F
-                        elif vDistance[2] < 0:
-                            self.for_back_velocity = -S - F
-                        else:
-                            self.for_back_velocity = 0
+            #             # for forward back
+            #             if vDistance[2] > 0:
+            #                 self.for_back_velocity = S + F
+            #             elif vDistance[2] < 0:
+            #                 self.for_back_velocity = -S - F
+            #             else:
+            #                 self.for_back_velocity = 0
 
-                    # Draw the face bounding box
-                    cv2.rectangle(frameRet, (x, y), (end_cord_x, end_cord_y), fbCol, fbStroke)
+            #         # Draw the face bounding box
+            #         cv2.rectangle(frameRet, (x, y), (end_cord_x, end_cord_y), fbCol, fbStroke)
 
-                    # Draw the target as a circle
-                    cv2.circle(frameRet, (targ_cord_x, targ_cord_y), 10, (0,255,0), 2)
+            #         # Draw the target as a circle
+            #         cv2.circle(frameRet, (targ_cord_x, targ_cord_y), 10, (0,255,0), 2)
 
-                    # Draw the safety zone
-                    cv2.rectangle(frameRet, (targ_cord_x - szX, targ_cord_y - szY), (targ_cord_x + szX, targ_cord_y + szY), (0,255,0), fbStroke)
+            #         # Draw the safety zone
+            #         cv2.rectangle(frameRet, (targ_cord_x - szX, targ_cord_y - szY), (targ_cord_x + szX, targ_cord_y + szY), (0,255,0), fbStroke)
 
-                    # Draw the estimated drone vector position in relation to face bounding box
-                    cv2.putText(frameRet,str(vDistance),(0,64),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),2)
+            #         # Draw the estimated drone vector position in relation to face bounding box
+            #         cv2.putText(frameRet,str(vDistance),(0,64),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),2)
 
-                # if there are no faces detected, don't do anything
-                if noFaces:
-                    self.yaw_velocity = 0
-                    self.up_down_velocity = 0
-                    self.for_back_velocity = 0
-                    print("NO TARGET")
+            #     # if there are no faces detected, don't do anything
+            #     if noFaces:
+            #         self.yaw_velocity = 0
+            #         self.up_down_velocity = 0
+            #         self.for_back_velocity = 0
+            #         print("NO TARGET")
                 
             # Draw the center of screen circle, this is what the drone tries to match with the target coords
             cv2.circle(frameRet, (cWidth, cHeight), 10, (0,0,255), 2)
