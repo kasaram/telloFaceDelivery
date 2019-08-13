@@ -31,7 +31,7 @@ args = parser.parse_args()
 
 # Speed of the drone
 S = 20
-
+v_for_back = 15
 
 # this is just the bound box sizes that openCV spits out *shrug*
 faceSizes = [1026, 684, 456, 304, 202, 136, 90]
@@ -277,6 +277,8 @@ class FrontEnd(object):
             
             tolerance_x = 100
             tolerance_y = 100
+            depth_box_size = 150
+            depth_tolerance = 50
 
             noFaces = len(face_encodings) == 0
 
@@ -350,6 +352,19 @@ class FrontEnd(object):
                             (target_point_x - tolerance_x, target_point_y - tolerance_y),
                             (target_point_x + tolerance_x, target_point_y + tolerance_y),
                             (0, 255, 0) if target_reached else (0, 255, 255), 2)
+
+                        close_enough = (right-left) > depth_box_size * 2 - depth_tolerance \
+                                        and (right-left) < depth_box_size * 2 + depth_tolerance \
+                                        and (bottom-top) > depth_box_size * 2 - depth_tolerance \
+                                        and (bottom-top) < depth_box_size * 2 + depth_tolerance
+
+                        # Draw the target zone
+                        cv2.rectangle(
+                            frameRet,
+                            (target_point_x - depth_box_size, target_point_y - depth_box_size),
+                            (target_point_x + depth_box_size, target_point_y + depth_box_size),
+                            (0, 255, 0) if close_enough else (255, 0, 0), 2)
+
                         
                         if not target_reached:
                             target_offset_x = target_point_x - heading_point_x
@@ -362,6 +377,15 @@ class FrontEnd(object):
                         else:
                             self.yaw_velocity = 0
                             self.up_down_velocity = 0
+
+                        if not close_enough:
+                            depth_offset = (right -left) - depth_box_size * 2
+                            if depth_offset < depth_box_size * 2 and not target_reached:
+                                self.for_back_velocity = 0
+                            else:
+                                self.for_back_velocity = -round(v_for_back * translate(depth_offset, -depth_box_size, depth_box_size, -1, 1))
+                        else:
+                            self.for_back_velocity = 0
 
                 if noFaces:
                     self.yaw_velocity = 0
