@@ -31,8 +31,7 @@ args = parser.parse_args()
 
 # Speed of the drone
 S = 20
-S2 = 5
-UDOffset = 150
+
 
 # this is just the bound box sizes that openCV spits out *shrug*
 faceSizes = [1026, 684, 456, 304, 202, 136, 90]
@@ -346,6 +345,10 @@ class FrontEnd(object):
                             (target_point_x - tolerance_x, target_point_y - tolerance_y),
                             (target_point_x + tolerance_x, target_point_y + tolerance_y),
                             (0, 255, 255), 2)
+
+                        
+                        
+                        
                         
                             
 
