@@ -360,6 +360,10 @@ class FrontEnd(object):
                             self.up_down_velocity = -round(S * translate(target_offset_y, -dimensions[1]/2, dimensions[1] / 2, -1, 1))
                             
                             print("YAW SPEED {} UD SPEED {}".format(self.yaw_velocity, self.up_down_velocity))
+                        else:
+                            self.yaw_velocity = 0
+                            self.up_down_velocity = 0
+
                 if noFaces:
                     self.yaw_velocity = 0
                     self.up_down_velocity = 0
