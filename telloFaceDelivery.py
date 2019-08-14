@@ -3,6 +3,7 @@
 # Extended / reworked by Luca Fluri & Dario Breitenstein
 
 from djitellopy import Tello
+from appJar import gui
 import face_recognition
 import cv2
 import numpy as np
@@ -11,6 +12,8 @@ import datetime
 import os
 import shutil
 import uuid
+
+app = gui("Drone Delivery System Command Center", "500x750")
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -37,6 +40,8 @@ unknown_face_name = "unknown"
 known_face_encodings = []
 known_face_names = []
 
+
+
 class FrontEnd(object):
     
     
@@ -62,6 +67,7 @@ class FrontEnd(object):
 
     def run(self):
         addAllFaces()
+        createGui()
 
         if not self.tello.connect():
             print("Tello not connected")
@@ -378,6 +384,23 @@ def addAllFaces():
     
     for file in os.listdir("new_faces/"):
         os.remove("new_faces/" + file)
+
+def createGui():
+    #app = gui("Test", "250x250")
+    app.startScrollPane("PANE")
+    countX = 0
+    countY = 0
+    for face in os.listdir("known_faces"):
+        if(countX == 3): 
+            countX = 0; countY +=1
+        app.addImageButton(face, None, "known_faces/" + face, row=countX, column=countY)
+        app.setButtonWidth(face, 225)
+        print(countX, countY)
+        countX += 1
+        
+
+    app.stopScrollPane()
+    app.go()
 
 def map_values(value, leftMin, leftMax, rightMin, rightMax):
     # Figure out how 'wide' each range is
