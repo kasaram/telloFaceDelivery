@@ -12,10 +12,15 @@ import os
 import shutil
 import uuid
 
-
 # Speed of the drone
 v_yaw_pitch = 100
 v_for_back = 15
+
+# Tracking tolerances
+tolerance_x = 50
+tolerance_y = 50
+depth_box_size = 150
+depth_tolerance = 50
 
 # Frames per second of the pygame window display
 FPS = 25
@@ -23,23 +28,12 @@ dimensions = (960, 720)
 
 
 # Face Recognition
-'''
-dario_image = face_recognition.load_image_file("known_faces/dario.png")
-dario_face_encoding = face_recognition.face_encodings(dario_image)[0]
-
-luca_image = face_recognition.load_image_file("known_faces/luca.png")
-luca_face_encoding = face_recognition.face_encodings(luca_image)[0]
-'''
-
+unknown_face_name = "unknown"
 
 # Create arrays of known face encodings and their names
 
-known_face_encodings = [
-
-]
-known_face_names = [
-
-]
+known_face_encodings = []
+known_face_names = []
 
 class FrontEnd(object):
     
@@ -54,9 +48,11 @@ class FrontEnd(object):
         self.yaw_velocity = 0
         self.speed = 10
 
+        # Enroll mode: Try to find new faces
+        self.enroll_mode = False
+
     def run(self):
         addAllFaces()
-
 
         if not self.tello.connect():
             print("Tello not connected")
@@ -103,25 +99,32 @@ class FrontEnd(object):
 
             # Press T to take off
             if k == ord('t'):
-                if not args.debug:
-                    print("Taking Off")
-                    self.tello.takeoff()
-                    self.tello.get_battery()
+                print("Taking Off")
+                self.tello.takeoff()
+                self.tello.get_battery()
 
             # Press L to land
             if k == ord('l'):
-                if not args.debug:
-                    print("Landing")
-                    self.tello.land()
+                print("Landing")
+                self.tello.land()
 
-            # Press Backspace for controls override
-            if k == 8:
+            # Press o for controls override
+            if k == ord('o'):
                 if not OVERRIDE:
                     OVERRIDE = True
                     print("OVERRIDE ENABLED")
                 else:
                     OVERRIDE = False
                     print("OVERRIDE DISABLED")
+            
+            # g to toggle to enroll mode
+            if k == ord('v'):
+                if self.enroll_mode:
+                    print("ENROLL MODE OFF")
+                    self.enroll_mode = False
+                else:
+                    print("ENROLL MODE ON")
+                    self.enroll_mode = True
 
             if OVERRIDE:
                 # W & S to fly forward & back
@@ -148,13 +151,14 @@ class FrontEnd(object):
                 else:
                     self.up_down_velocity = 0
 
-                # c & z to fly right & left
+                # d & a to fly right & left
                 if k == ord('d'):
                     self.left_right_velocity = v_for_back
                 elif k == ord('a'):
                     self.left_right_velocity = -v_for_back
                 else:
                     self.left_right_velocity = 0
+
 
             # Quit the software
             if k == 27: # escape key
@@ -165,144 +169,60 @@ class FrontEnd(object):
             capture_divider = 0.5
             recognition_frame = cv2.resize(frameRet, (0, 0), fx=capture_divider, fy=capture_divider) #BGR is used, not RGB
             
+            if self.enroll_mode: capture_frame = frameRet.copy()
+
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
             # recognition_frame = bgr_recognition_frame[:, :, ::-1]
             
             face_locations = face_recognition.face_locations(recognition_frame)
             face_encodings = face_recognition.face_encodings(recognition_frame, face_locations)
-            
-            tolerance_x = 50
-            tolerance_y = 50
-            depth_box_size = 150
-            depth_tolerance = 50
 
             if not OVERRIDE:
-                face_names = []
-                for face_encoding in face_encodings:
-                    # See if the face is a match for the known face(s)
-                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-                    name = "Who dis?"
-
-        
-                    # Use the known face with the smallest distance to the new face
-                    face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-                    best_match_index = np.argmin(face_distances)
-                    if matches[best_match_index]:
-                        name = known_face_names[best_match_index] 
-                    
-                    face_names.append(name)
-                
                 face_locked = False
-                for (top, right, bottom, left), name in zip(face_locations, face_names):
+                for (top, right, bottom, left), name in detect_faces(face_locations, face_encodings):
                     # Scale back up face locations since the frame we detected in was scaled to 1/4 size
                     top = int(top * 1/capture_divider)
                     right = int(right * 1/capture_divider)
                     bottom = int(bottom * 1/capture_divider)
                     left = int(left * 1/capture_divider)
+                    
+                    x = left
+                    y = top
+                    w = right - left
+                    h = bottom - top
 
-                    if name is not "Who dis?":
-                        # Draw a box around the face
-                        cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
-                
+                    # Draw a box around the face
+                    cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
+
+                    if name is not unknown_face_name:
                         # Draw a label with a name below the face
                         cv2.rectangle(frameRet, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
                         font = cv2.FONT_HERSHEY_DUPLEX
                         cv2.putText(frameRet, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
-                    if name is not "Who dis?" and not face_locked:
-                        face_locked = True
+                    if self.enroll_mode:
+                        if name is unknown_face_name:
+                            target_reached = self.approach_target(frameRet, top,right, bottom, left)
 
-                        # Track the face
-                        # top, right, bottom, left, name
-                        
-                        x = left
-                        y = top
-                        w = right - left
-                        h = bottom - top
-
-                        target_point_x = int(left + (w/2))
-                        target_point_y = int(top  + (h/2))
-
-                        # Draw the target point
-                        cv2.circle(frameRet,
-                            (target_point_x, target_point_y),
-                            10, (0, 255, 0), 2)
-
-                        heading_point_x = int(dimensions[0] / 2)
-                        heading_point_y = int(dimensions[1] / 2)
-                        
-                        # Draw the heading point
-                        cv2.circle(
-                            frameRet,
-                            (heading_point_x, heading_point_y),
-                            5, (0, 0, 255), 2)
-                        
-                        target_reached = heading_point_x >= (target_point_x - tolerance_x) \
-                                            and heading_point_x <= (target_point_x + tolerance_x) \
-                                            and heading_point_y >= (target_point_y - tolerance_y) \
-                                            and heading_point_y <= (target_point_y + tolerance_y)
-
-                        # Draw the target zone
-                        cv2.rectangle(
-                            frameRet,
-                            (target_point_x - tolerance_x, target_point_y - tolerance_y),
-                            (target_point_x + tolerance_x, target_point_y + tolerance_y),
-                            (0, 255, 0) if target_reached else (0, 255, 255), 2)
-
-                        close_enough = (right-left) > depth_box_size * 2 - depth_tolerance \
-                                        and (right-left) < depth_box_size * 2 + depth_tolerance \
-                                        and (bottom-top) > depth_box_size * 2 - depth_tolerance \
-                                        and (bottom-top) < depth_box_size * 2 + depth_tolerance
-
-                        # Draw the target zone
-                        cv2.rectangle(
-                            frameRet,
-                            (target_point_x - depth_box_size, target_point_y - depth_box_size),
-                            (target_point_x + depth_box_size, target_point_y + depth_box_size),
-                            (0, 255, 0) if close_enough else (255, 0, 0), 2)
-
-                        
-                        if not target_reached:
-                            target_offset_x = target_point_x - heading_point_x
-                            target_offset_y = target_point_y - heading_point_y
-                            
-                            self.yaw_velocity = round(v_yaw_pitch * map_values(target_offset_x, -dimensions[0], dimensions[0], -1, 1))
-                            self.up_down_velocity = -round(v_yaw_pitch * map_values(target_offset_y, -dimensions[1], dimensions[1], -1, 1))
-                            print("YAW SPEED {} UD SPEED {}".format(self.yaw_velocity, self.up_down_velocity))
-
-                        if not close_enough:
-                            depth_offset = (right - left) - depth_box_size * 2
-                            if (right - left) > depth_box_size * 1.5 and not target_reached:
-                                self.for_back_velocity = 0
-                            else:
-                                self.for_back_velocity = -round(v_for_back * map_values(depth_offset, -depth_box_size, depth_box_size, -1, 1))
-                        else:
-                            self.for_back_velocity = 0
-                    elif name is "Who dis?":
-                        x = left
-                        y = top
-                        w = right - left
-                        h = bottom - top
-
-                        newUUID = uuid.uuid4()
-                        newFacePath = "new_faces/{}.png".format(newUUID)
-                        roi = frameRet[y:y+h, x:x+w]
-                        cv2.imwrite(newFacePath, roi)
-
-                        if addFace(newFacePath, str(newUUID)):
-                            shutil.copy2(newFacePath, "known_faces/{}.png".format(newUUID))
-                        
-
-                        # Draw a box around the face
-                        cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
-
+                            if target_reached:
+                                newUUID = uuid.uuid4()
+                                newFacePath = "new_faces/{}.png".format(newUUID)
+                                roi = capture_frame[y:y+h, x:x+w]
+                                cv2.imwrite(newFacePath, roi)
+        
+                                if addFace(newFacePath, str(newUUID)):
+                                    shutil.copy2(newFacePath, "known_faces/{}.png".format(newUUID))
+                            break
+                    else:
+                        if name is not unknown_face_name:
+                            target_reached = self.approach_target(frameRet, top,right, bottom, left)
+                            break
 
                 # No Faces
                 if len(face_encodings) == 0:
                     self.yaw_velocity = 0
                     self.up_down_velocity = 0
                     self.for_back_velocity = 0
-                    print("NO TARGET")
 
             # Display the resulting frame
             cv2.imshow(f'Tello Tracking...',frameRet)
@@ -315,7 +235,76 @@ class FrontEnd(object):
         
         # Call it always before finishing. I deallocate resources.
         self.tello.end()
-
+    
+    def approach_target(self, frameRet, top, right, bottom, left):
+        x = left
+        y = top
+        w = right - left
+        h = bottom - top
+    
+        # The Center point of our Target
+        target_point_x = int(left + (w/2))
+        target_point_y = int(top  + (h/2))
+    
+        # Draw the target point
+        cv2.circle(frameRet,
+            (target_point_x, target_point_y),
+            10, (0, 255, 0), 2)
+    
+        # The Center Point of the drone's view
+        heading_point_x = int(dimensions[0] / 2)
+        heading_point_y = int(dimensions[1] / 2)
+    
+        # Draw the heading point
+        cv2.circle(
+            frameRet,
+            (heading_point_x, heading_point_y),
+            5, (0, 0, 255), 2)
+    
+        target_reached = heading_point_x >= (target_point_x - tolerance_x) \
+                        and heading_point_x <= (target_point_x + tolerance_x) \
+                        and heading_point_y >= (target_point_y - tolerance_y) \
+                        and heading_point_y <= (target_point_y + tolerance_y)
+    
+        # Draw the target zone
+        cv2.rectangle(
+            frameRet,
+            (target_point_x - tolerance_x, target_point_y - tolerance_y),
+            (target_point_x + tolerance_x, target_point_y + tolerance_y),
+            (0, 255, 0) if target_reached else (0, 255, 255), 2)
+    
+        close_enough = (right-left) > depth_box_size * 2 - depth_tolerance \
+                        and (right-left) < depth_box_size * 2 + depth_tolerance \
+                        and (bottom-top) > depth_box_size * 2 - depth_tolerance \
+                        and (bottom-top) < depth_box_size * 2 + depth_tolerance
+    
+        # Draw the target zone
+        cv2.rectangle(
+        frameRet,
+        (target_point_x - depth_box_size, target_point_y - depth_box_size),
+        (target_point_x + depth_box_size, target_point_y + depth_box_size),
+        (0, 255, 0) if close_enough else (255, 0, 0), 2)
+    
+    
+        if not target_reached:
+            target_offset_x = target_point_x - heading_point_x
+            target_offset_y = target_point_y - heading_point_y
+    
+            self.yaw_velocity = round(v_yaw_pitch * map_values(target_offset_x, -dimensions[0], dimensions[0], -1, 1))
+            self.up_down_velocity = -round(v_yaw_pitch * map_values(target_offset_y, -dimensions[1], dimensions[1], -1, 1))
+            print("YAW SPEED {} UD SPEED {}".format(self.yaw_velocity, self.up_down_velocity))
+    
+        if not close_enough:
+            depth_offset = (right - left) - depth_box_size * 2
+            if (right - left) > depth_box_size * 1.5 and not target_reached:
+                self.for_back_velocity = 0
+            else:
+                self.for_back_velocity = -round(v_for_back * map_values(depth_offset, -depth_box_size, depth_box_size, -1, 1))
+        else:
+            self.for_back_velocity = 0
+        
+        return target_reached and close_enough
+    
     def battery(self):
         return self.tello.get_battery()[:2]
 
@@ -323,6 +312,24 @@ class FrontEnd(object):
         """ Update routine. Send velocities to Tello."""
         self.tello.send_rc_control(self.left_right_velocity, self.for_back_velocity, self.up_down_velocity,
                                     self.yaw_velocity)
+
+def detect_faces(face_locations, face_encodings):
+    face_names = []
+    for face_encoding in face_encodings:
+        # See if the face is a match for the known face(s)
+        matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+        name = unknown_face_name
+
+
+        # Use the known face with the smallest distance to the new face
+        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+        best_match_index = np.argmin(face_distances)
+        if matches[best_match_index]:
+            name = known_face_names[best_match_index] 
+        
+        face_names.append(name)
+    
+    return zip(face_locations, face_names)
 
 def lerp(a,b,c):
     return a + c*(b-a)
