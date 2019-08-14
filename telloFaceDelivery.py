@@ -9,6 +9,8 @@ import numpy as np
 import time
 import datetime
 import os
+import uuid
+
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -81,7 +83,7 @@ class FrontEnd(object):
                 frame_read.stop()
                 break
 
-            #frame not needed?
+
             frame = cv2.cvtColor(frame_read.frame, cv2.COLOR_BGR2RGB)
             frameRet = frame_read.frame
 
@@ -174,13 +176,14 @@ class FrontEnd(object):
                     # See if the face is a match for the known face(s)
                     matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
                     name = "Who dis?"
+
         
                     # Use the known face with the smallest distance to the new face
                     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
                     best_match_index = np.argmin(face_distances)
                     if matches[best_match_index]:
                         name = known_face_names[best_match_index] 
-        
+                    
                     face_names.append(name)
                 
                 face_locked = False
@@ -190,14 +193,15 @@ class FrontEnd(object):
                     right = int(right * 1/capture_divider)
                     bottom = int(bottom * 1/capture_divider)
                     left = int(left * 1/capture_divider)
-            
-                    # Draw a box around the face
-                    cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
-            
-                    # Draw a label with a name below the face
-                    cv2.rectangle(frameRet, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-                    font = cv2.FONT_HERSHEY_DUPLEX
-                    cv2.putText(frameRet, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+                    if name is not "Who dis?":
+                        # Draw a box around the face
+                        cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
+                
+                        # Draw a label with a name below the face
+                        cv2.rectangle(frameRet, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                        font = cv2.FONT_HERSHEY_DUPLEX
+                        cv2.putText(frameRet, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
                     if name is not "Who dis?" and not face_locked:
                         face_locked = True
@@ -268,7 +272,19 @@ class FrontEnd(object):
                                 self.for_back_velocity = -round(v_for_back * map_values(depth_offset, -depth_box_size, depth_box_size, -1, 1))
                         else:
                             self.for_back_velocity = 0
-  
+                    elif name is "Who dis?":
+                        x = left
+                        y = top
+                        w = right - left
+                        h = bottom - top
+
+                        roi = frameRet[y:y+h, x:x+w]
+                        cv2.imwrite("new_faces/{}.png".format(uuid.uuid4()), roi)
+
+                        # Draw a box around the face
+                        cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
+
+
                 # No Faces
                 if len(face_encodings) == 0:
                     self.yaw_velocity = 0
