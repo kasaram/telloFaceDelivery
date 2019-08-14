@@ -13,7 +13,7 @@ import os
 import shutil
 import uuid
 
-app = gui("Drone Delivery System Command Center", "500x750")
+app = gui("Drone Delivery System Command Center", "750x750")
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -34,6 +34,7 @@ dimensions = (960, 720)
 
 # Face Recognition
 unknown_face_name = "unknown"
+target_name = ""
 
 # Create arrays of known face encodings and their names
 
@@ -387,20 +388,30 @@ def addAllFaces():
 
 def createGui():
     #app = gui("Test", "250x250")
+    app.addLabel("label", "")
+    app.setLabelHeight("label", 0.5)
     app.startScrollPane("PANE")
     countX = 0
     countY = 0
     for face in os.listdir("known_faces"):
         if(countX == 3): 
             countX = 0; countY +=1
-        app.addImageButton(face, None, "known_faces/" + face, row=countX, column=countY)
+        app.addImageButton(face, press, "known_faces/" + face, row=countX, column=countY)
         app.setButtonWidth(face, 225)
         print(countX, countY)
         countX += 1
-        
+    app.addButton("clearTarget", clear)
 
     app.stopScrollPane()
     app.go()
+
+def press(button):
+    target = button[:-4]
+    print(target)
+    target_name = target
+    app.setLabel("label", target)
+def clear(button):
+    target_name = ""
 
 def map_values(value, leftMin, leftMax, rightMin, rightMax):
     # Figure out how 'wide' each range is
