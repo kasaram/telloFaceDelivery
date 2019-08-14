@@ -27,6 +27,7 @@ FPS = 25
 dimensions = (960, 720)
 
 
+
 # Face Recognition
 unknown_face_name = "unknown"
 
@@ -36,6 +37,7 @@ known_face_encodings = []
 known_face_names = []
 
 class FrontEnd(object):
+    
     
     def __init__(self):
         # Init Tello object that interacts with the Tello drone
@@ -179,6 +181,8 @@ class FrontEnd(object):
 
             if not OVERRIDE:
                 face_locked = False
+
+        
                 for (top, right, bottom, left), name in detect_faces(face_locations, face_encodings):
                     # Scale back up face locations since the frame we detected in was scaled to 1/4 size
                     top = int(top * 1/capture_divider)
@@ -219,8 +223,12 @@ class FrontEnd(object):
                             break
 
                 # No Faces
+                
                 if len(face_encodings) == 0:
-                    self.yaw_velocity = 0
+                    print("no faces")
+                    #turn while no face detected
+                                
+                    self.yaw_velocity = 10
                     self.up_down_velocity = 0
                     self.for_back_velocity = 0
 
@@ -235,6 +243,7 @@ class FrontEnd(object):
         
         # Call it always before finishing. I deallocate resources.
         self.tello.end()
+    
     
     def approach_target(self, frameRet, top, right, bottom, left):
         x = left
