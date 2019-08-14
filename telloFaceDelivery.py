@@ -46,7 +46,6 @@ class FrontEnd(object):
         self.left_right_velocity = 0
         self.up_down_velocity = 0
         self.yaw_velocity = 0
-        self.speed = 10
 
     def run(self):
 
@@ -70,7 +69,6 @@ class FrontEnd(object):
         frame_read = self.tello.get_frame_read()
 
         should_stop = False
-        imgCount = 0
         OVERRIDE = False
 
         self.tello.get_battery()
@@ -82,6 +80,7 @@ class FrontEnd(object):
                 frame_read.stop()
                 break
 
+            #frame not needed?
             frame = cv2.cvtColor(frame_read.frame, cv2.COLOR_BGR2RGB)
             frameRet = frame_read.frame
 
