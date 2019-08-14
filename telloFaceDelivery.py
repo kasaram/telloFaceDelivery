@@ -416,6 +416,7 @@ def press(button):
 def clear(button):
     target_name = ""
     print("target cleared")
+    app.setLabel("label", target_name)
 
 def map_values(value, leftMin, leftMax, rightMin, rightMax):
     # Figure out how 'wide' each range is
