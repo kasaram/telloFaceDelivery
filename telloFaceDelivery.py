@@ -158,7 +158,7 @@ class FrontEnd(object):
             recognition_frame = cv2.resize(frameRet, (0, 0), fx=capture_divider, fy=capture_divider) #BGR is used, not RGB
             
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-            # rgb_small_frame = bgr_recognition_frame[:, :, ::-1]
+            # recognition_frame = bgr_recognition_frame[:, :, ::-1]
             
             face_locations = face_recognition.face_locations(recognition_frame)
             face_encodings = face_recognition.face_encodings(recognition_frame, face_locations)
