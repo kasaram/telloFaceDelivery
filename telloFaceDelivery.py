@@ -22,11 +22,11 @@ tolerance_y = 50
 depth_box_size = 150
 depth_tolerance = 50
 
+detection_wait_interval = 10
+
 # Frames per second of the pygame window display
 FPS = 25
 dimensions = (960, 720)
-
-
 
 # Face Recognition
 unknown_face_name = "unknown"
@@ -52,6 +52,12 @@ class FrontEnd(object):
 
         # Enroll mode: Try to find new faces
         self.enroll_mode = False
+
+        self.face_locations = None
+        self.face_encodings = None    
+        self.has_face = False    
+        self.detect_faces = True
+        self.wait = 0
 
     def run(self):
         addAllFaces()
@@ -176,14 +182,17 @@ class FrontEnd(object):
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
             # recognition_frame = bgr_recognition_frame[:, :, ::-1]
             
-            face_locations = face_recognition.face_locations(recognition_frame)
-            face_encodings = face_recognition.face_encodings(recognition_frame, face_locations)
+            if self.detect_faces:
+                self.face_locations = face_recognition.face_locations(recognition_frame)
+                self.face_encodings = face_recognition.face_encodings(recognition_frame, self.face_locations)
+                self.detect_faces = False
+            else:
+                self.detect_faces = True
 
             if not OVERRIDE:
                 face_locked = False
-
         
-                for (top, right, bottom, left), name in detect_faces(face_locations, face_encodings):
+                for (top, right, bottom, left), name in detect_faces(self.face_locations, self.face_encodings):
                     # Scale back up face locations since the frame we detected in was scaled to 1/4 size
                     top = int(top * 1/capture_divider)
                     right = int(right * 1/capture_divider)
@@ -223,14 +232,21 @@ class FrontEnd(object):
                             break
 
                 # No Faces
-                
-                if len(face_encodings) == 0:
-                    print("no faces")
-                    #turn while no face detected
-                                
-                    self.yaw_velocity = 10
-                    self.up_down_velocity = 0
-                    self.for_back_velocity = 0
+                if len(self.face_encodings) == 0:
+                    # turn while no face detected
+                    if self.wait >= detection_wait_interval:
+                        self.wait = 0
+                        
+                        if self.has_face:
+                            self.has_face = False
+                            self.up_down_velocity = -30
+                            self.for_back_velocity = -20
+                        else:
+                            self.yaw_velocity = 25
+                            self.up_down_velocity = 0
+                            self.for_back_velocity = 0
+                    else:
+                        self.wait += 1
 
             # Display the resulting frame
             cv2.imshow(f'Tello Tracking...',frameRet)
@@ -250,7 +266,9 @@ class FrontEnd(object):
         y = top
         w = right - left
         h = bottom - top
-    
+        
+        self.has_face = True
+
         # The Center point of our Target
         target_point_x = int(left + (w/2))
         target_point_y = int(top  + (h/2))
@@ -328,7 +346,6 @@ def detect_faces(face_locations, face_encodings):
         # See if the face is a match for the known face(s)
         matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
         name = unknown_face_name
-
 
         # Use the known face with the smallest distance to the new face
         face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
