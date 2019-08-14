@@ -15,6 +15,7 @@ import uuid
 # Speed of the drone
 v_yaw_pitch = 100
 v_for_back = 15
+v_for_back_override = 50
 
 # Tracking tolerances
 tolerance_x = 50
@@ -137,9 +138,9 @@ class FrontEnd(object):
             if OVERRIDE:
                 # W & S to fly forward & back
                 if k == ord('s'):
-                    self.for_back_velocity = v_for_back
+                    self.for_back_velocity = v_for_back_override
                 elif k == ord('w'):
-                    self.for_back_velocity = -v_for_back
+                    self.for_back_velocity = -v_for_back_override
                 else:
                     self.for_back_velocity = 0
 
@@ -161,9 +162,9 @@ class FrontEnd(object):
 
                 # d & a to fly right & left
                 if k == ord('d'):
-                    self.left_right_velocity = v_for_back
+                    self.left_right_velocity = v_for_back_override
                 elif k == ord('a'):
-                    self.left_right_velocity = -v_for_back
+                    self.left_right_velocity = -v_for_back_override
                 else:
                     self.left_right_velocity = 0
 
