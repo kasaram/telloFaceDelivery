@@ -9,6 +9,7 @@ import numpy as np
 import time
 import datetime
 import os
+import shutil
 import uuid
 
 
@@ -20,21 +21,24 @@ v_for_back = 15
 FPS = 25
 dimensions = (960, 720)
 
+
 # Face Recognition
+'''
 dario_image = face_recognition.load_image_file("known_faces/dario.png")
 dario_face_encoding = face_recognition.face_encodings(dario_image)[0]
 
 luca_image = face_recognition.load_image_file("known_faces/luca.png")
 luca_face_encoding = face_recognition.face_encodings(luca_image)[0]
+'''
+
 
 # Create arrays of known face encodings and their names
+
 known_face_encodings = [
-    dario_face_encoding,
-    luca_face_encoding
+
 ]
 known_face_names = [
-    "Dario",
-    "Luca"
+
 ]
 
 class FrontEnd(object):
@@ -51,6 +55,8 @@ class FrontEnd(object):
         self.speed = 10
 
     def run(self):
+        addAllFaces()
+
 
         if not self.tello.connect():
             print("Tello not connected")
@@ -278,8 +284,14 @@ class FrontEnd(object):
                         w = right - left
                         h = bottom - top
 
+                        newUUID = uuid.uuid4()
+                        newFacePath = "new_faces/{}.png".format(newUUID)
                         roi = frameRet[y:y+h, x:x+w]
-                        cv2.imwrite("new_faces/{}.png".format(uuid.uuid4()), roi)
+                        cv2.imwrite(newFacePath, roi)
+
+                        if addFace(newFacePath, str(newUUID)):
+                            shutil.copy2(newFacePath, "known_faces/{}.png".format(newUUID))
+                        
 
                         # Draw a box around the face
                         cv2.rectangle(frameRet, (left, top), (right, bottom), (0, 0, 255), 2)
@@ -314,6 +326,24 @@ class FrontEnd(object):
 
 def lerp(a,b,c):
     return a + c*(b-a)
+
+def addFace(file, name):
+    face_img = face_recognition.load_image_file(file)
+    face_encodings = face_recognition.face_encodings(face_img)
+
+    if len(face_encodings) > 0:
+        known_face_encodings.append(face_encodings[0])   
+        known_face_names.append(name)
+        return True
+    return False
+
+def addAllFaces():
+    for face in os.listdir("known_faces/"):
+        print(face[:-4])
+        addFace("known_faces/" + face, face[:-4])
+    
+    for file in os.listdir("new_faces/"):
+        os.remove("new_faces/" + file)
 
 def map_values(value, leftMin, leftMax, rightMin, rightMax):
     # Figure out how 'wide' each range is
