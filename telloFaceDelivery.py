@@ -46,6 +46,7 @@ class FrontEnd(object):
         self.left_right_velocity = 0
         self.up_down_velocity = 0
         self.yaw_velocity = 0
+        self.speed = 10
 
     def run(self):
 
