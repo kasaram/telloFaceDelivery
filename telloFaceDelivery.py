@@ -389,18 +389,20 @@ def addAllFaces():
 def createGui():
     #app = gui("Test", "250x250")
     app.addLabel("label", "")
-    app.setLabelHeight("label", 0.5)
+    app.setLabelHeight("label", 1)
+    app.addButton("clearTarget", clear)
+    app.set
     app.startScrollPane("PANE")
     countX = 0
     countY = 0
     for face in os.listdir("known_faces"):
         if(countX == 3): 
             countX = 0; countY +=1
-        app.addImageButton(face, press, "known_faces/" + face, row=countX, column=countY)
+        app.addImageButton(face, press, "known_faces/" + face, row=countY, column=countX)
         app.setButtonWidth(face, 225)
         print(countX, countY)
         countX += 1
-    app.addButton("clearTarget", clear)
+    
 
     app.stopScrollPane()
     app.go()
@@ -410,8 +412,10 @@ def press(button):
     print(target)
     target_name = target
     app.setLabel("label", target)
+
 def clear(button):
     target_name = ""
+    print("target cleared")
 
 def map_values(value, leftMin, leftMax, rightMin, rightMax):
     # Figure out how 'wide' each range is
