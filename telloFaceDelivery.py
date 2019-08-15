@@ -487,7 +487,7 @@ def drone_command():
     if 'target_name' in data:
         drone.set_target_name(data['target_name'])
     
-    return Response()
+    return Response(status=200)
 
 if __name__ == '__main__': 
     drone = DroneControl()

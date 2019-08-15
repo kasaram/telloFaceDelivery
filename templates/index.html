@@ -9,20 +9,77 @@
 
     <button id="take_off">Take Off</button>
     <button id="land">Land</button>
+    <button id="toggle_override">Toggle Override</button>
     <script>
+      var override = false
+      var v_directional = 50
+      var v_yaw_pitch = 100
+
       $(document).ready(function() {
         $('#take_off').click(function(e){
-          console.log("click")
           sendCommand({
             command: 'take_off'
           })
         })
 
         $('#land').click(function(e){
-          console.log("click")
           sendCommand({
             command: 'land'
           })
+        })
+
+        $('#toggle_override').click(function(e){
+          override = !override
+          sendCommand({
+            autonomous: !override
+          })
+        })
+
+        $(document).keypress(function(event) {
+          if (override) {
+              var payload = {}
+
+              if (event.keyCode === 119) { // w
+                payload['for_back_velocity'] = v_directional
+              } else if (event.keyCode ===  115) { // s
+                payload['for_back_velocity'] = -v_directional
+              }
+
+              if (event.keyCode === 100) { // d
+                payload['left_right_velocity'] = v_directional
+              } else if (event.keyCode ===  97) { // a
+                payload['left_right_velocity'] = -v_directional
+              }
+
+              if (event.keyCode === 113) { // q
+                payload['yaw_velocity'] = -v_yaw_pitch
+              } else if (event.keyCode ===  101) { // e
+                payload['yaw_velocity'] = v_yaw_pitch
+              }
+
+              if (event.keyCode === 114) { // r
+                payload['up_down_velocity'] = v_directional
+              } else if (event.keyCode ===  102) { // f
+                payload['up_down_velocity'] = -v_directional
+              }
+              
+              console.log(payload)
+              sendCommand(payload)
+          }
+        })
+
+        $(document).keyup(function(event) {
+          if (override) {
+            var payload = {
+              'for_back_velocity': 0,
+              'left_right_velocity': 0,
+              'yaw_velocity': 0,
+              'up_down_velocity': 0
+            }
+
+            console.log(payload)
+            sendCommand(payload)
+          }
         })
       })
 
@@ -35,9 +92,6 @@
           dataType: "json",
           success: function(result) {
             console.log("ACK")
-          },
-          error: function(result) {
-            console.error(result)
           }
         })
       }
