@@ -10,7 +10,7 @@ import datetime
 import os, sys
 import shutil
 import uuid
-from flask import Flask, render_template, Response 
+from flask import Flask, render_template, Response, jsonify
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -450,6 +450,14 @@ def video_feed():
    """Video streaming route. Put this in the src attribute of an img tag.""" 
    return Response(video_gen(), mimetype='multipart/x-mixed-replace; boundary=frame') 
 
+@app.route('/known_faces'):
+def known_faces():
+    return jsonify(filenames=os.listdir('known_faces/'))
+
+
+
+
 if __name__ == '__main__': 
     drone = DroneControl()
     app.run(host='0.0.0.0', debug=False, threaded=True)
+
