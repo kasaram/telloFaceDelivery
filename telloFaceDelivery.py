@@ -10,7 +10,7 @@ import datetime
 import os, sys
 import shutil
 import uuid
-from flask import Flask, render_template, Response 
+from flask import Flask, render_template, Response, jsonify, request, send_from_directory
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -84,6 +84,8 @@ class DroneControl(object):
         if not self.tello.streamon():
             print("Could not start video stream")
             raise Exception("Could not start video stream")
+
+        self.loop()
     
     def loop(self):
         self.update_rc_control()
@@ -445,12 +447,49 @@ def video_gen():
         except FileNotFoundError as e:
             pass
 
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
+
 @app.route('/video_feed') 
 def video_feed(): 
    """Video streaming route. Put this in the src attribute of an img tag.""" 
    return Response(video_gen(), mimetype='multipart/x-mixed-replace; boundary=frame') 
 
+@app.route('/known_faces')
+def known_faces():
+    return jsonify(filenames=os.listdir('known_faces/'))
+
+@app.route('/drone_command', methods=['POST'])
+def drone_command():
+    data = request.json
+    
+    if 'command' in data:
+        command = data['command']
+        print(command)
+        if command == 'take_off':
+            drone.take_off()
+        elif command == 'land':
+            drone.land()
+
+    if 'for_back_velocity' in data:
+        drone.set_for_back_velocity(data['for_back_velocity'])
+    if 'left_right_velocity' in data:
+        drone.set_left_right_velocity(data['left_right_velocity'])
+    if 'up_down_velocity' in data:
+        drone.set_up_down_velocity(data['up_down_velocity'])
+    if 'yaw_velocity' in data:
+        drone.set_yaw_velocity(data['yaw_velocity'])
+    if 'autonomous' in data:
+        drone.set_autonomous(data['autonomous'])
+    if 'enroll_mode' in data:
+        drone.set_enroll_mode(data['enroll_mode'])
+    if 'target_name' in data:
+        drone.set_target_name(data['target_name'])
+    
+    return Response()
 
 if __name__ == '__main__': 
     drone = DroneControl()
     app.run(host='0.0.0.0', debug=False, threaded=True)
+
