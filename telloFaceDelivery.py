@@ -7,9 +7,10 @@ import face_recognition
 import cv2
 import numpy as np
 import datetime
-import os
+import os, sys
 import shutil
 import uuid
+from flask import Flask, render_template, Response 
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -63,6 +64,9 @@ class DroneControl(object):
         self.wait = 0
 
         self.load_all_faces()
+
+        # Video frame for Streaming
+        self.frame_available = None
 
         if not self.tello.connect():
             print("Tello not connected")
@@ -170,7 +174,8 @@ class DroneControl(object):
                     self.wait += 1
 
         # Show video stream
-        cv2.imshow("Tello Drone Delivery", video_frame)
+        self.frame_available = video_frame
+        #cv2.imshow("Tello Drone Delivery", video_frame)
             
     def shutdown(self):
         # On exit, print the battery
@@ -318,6 +323,12 @@ class DroneControl(object):
     def set_up_down_velocity(self, up_down_velocity): self.up_down_velocity = up_down_velocity
     def set_yaw_velocity(self, yaw_velocity): self.yaw_velocity = yaw_velocity
 
+    def get_video_frame(self): 
+        video_frame = self.frame_available
+        self.frame_available = drone
+        
+        return video_frame
+
 def lerp(a,b,c):
     return a + c*(b-a)
 
@@ -410,8 +421,35 @@ def main():
                     drone.set_yaw_velocity(0)
 
         drone.shutdown()
+        sys.exit()
     except Exception as e:
         print(e)
 
-if __name__ == '__main__':
-    main()
+app = Flask(__name__) 
+drone = None
+
+@app.route('/') 
+def index(): 
+   """Video streaming .""" 
+   return render_template('./index.html') 
+
+def video_gen(): 
+    """Video streaming generator function.""" 
+    while True: 
+        drone.loop()
+        if drone.frame_available is not None:
+            cv2.imwrite('video_frame.jpg', drone.get_video_frame()) 
+        try:
+            yield (b'--frame\r\n' 
+                b'Content-Type: image/jpeg\r\n\r\n' + open('video_frame.jpg', 'rb').read() + b'\r\n') 
+        except FileNotFoundError as e:
+            pass
+
+@app.route('/video_feed') 
+def video_feed(): 
+   """Video streaming route. Put this in the src attribute of an img tag.""" 
+   return Response(video_gen(), mimetype='multipart/x-mixed-replace; boundary=frame') 
+
+if __name__ == '__main__': 
+    drone = DroneControl()
+    app.run(host='0.0.0.0', debug=False, threaded=True)
