@@ -1,6 +1,6 @@
 <html> 
   <head> 
-    <title>Video Streaming </title> 
+    <title>Drone Control Center </title> 
     <script src="/static/jquery-3.4.1.min.js"></script>
   </head> 
   <body> 
@@ -10,8 +10,11 @@
     <button id="take_off">Take Off</button>
     <button id="land">Land</button>
     <button id="toggle_override">Toggle Override</button>
+    <button id="toggle_enroll">Toggle Enroll</button>
+
     <script>
       var override = false
+      var enroll = false
       var v_directional = 50
       var v_yaw_pitch = 100
 
@@ -32,6 +35,13 @@
           override = !override
           sendCommand({
             autonomous: !override
+          })
+        })
+
+        $('#toggle_enroll').click(function(e){
+          enroll = !enroll
+          sendCommand({
+            enroll_mode: !enroll
           })
         })
 
