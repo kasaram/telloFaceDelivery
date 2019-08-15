@@ -1,9 +1,46 @@
 <html> 
   <head> 
     <title>Video Streaming </title> 
+    <script src="/static/jquery-3.4.1.min.js"></script>
   </head> 
   <body> 
     <h1> Live Video Streaming </h1> 
     <img src="{{ url_for('video_feed') }}"> 
+
+    <button id="take_off">Take Off</button>
+    <button id="land">Land</button>
+    <script>
+      $(document).ready(function() {
+        $('#take_off').click(function(e){
+          console.log("click")
+          sendCommand({
+            command: 'take_off'
+          })
+        })
+
+        $('#land').click(function(e){
+          console.log("click")
+          sendCommand({
+            command: 'land'
+          })
+        })
+      })
+
+      function sendCommand(data) {
+        $.ajax({
+          type: "POST",
+          url: "/drone_command",
+          data: JSON.stringify(data),
+          contentType: "application/json; charset=utf-8",
+          dataType: "json",
+          success: function(result) {
+            console.log("ACK")
+          },
+          error: function(result) {
+            console.error(result)
+          }
+        })
+      }
+    </script>
   </body> 
- </html> 
+</html> 
