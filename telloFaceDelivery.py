@@ -2,7 +2,8 @@
 # Based on Jabrils TelloTV Project
 # Extended / reworked by Luca Fluri & Dario Breitenstein
 
-from djitellopy import Tello
+#from djitellopy import Tello
+from tellopy import Tello
 import face_recognition
 import cv2
 import numpy as np
@@ -65,7 +66,6 @@ class FrontEnd(object):
 
     def run(self):
         addAllFaces()
-        createGui()
 
         if not self.tello.connect():
             print("Tello not connected")
