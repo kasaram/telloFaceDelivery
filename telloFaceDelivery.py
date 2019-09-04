@@ -10,7 +10,8 @@ import datetime
 import os, sys
 import shutil
 import uuid
-from flask import Flask, render_template, Response, jsonify, request, send_from_directory
+from flask import Flask, render_template, Response, jsonify, request, send_from_directory, redirect, url_for
+from flask_cors import CORS
 
 # Speed of the drone
 v_yaw_pitch = 100
@@ -139,6 +140,8 @@ class DroneControl(object):
                         cv2.rectangle(video_frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
                         cv2.putText(video_frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
+                    print(self.target_name + '-' + name)
+
                     if self.enroll_mode:
                         if name is unknown_face_name:
                             target_reached = self.approach_target(video_frame, top,right, bottom, left)
@@ -152,7 +155,7 @@ class DroneControl(object):
                                 if self.load_face(newFacePath, str(newUUID)):
                                     shutil.copy2(newFacePath, "known_faces/{}.png".format(newUUID))
                             break
-                    elif (self.target_name and name is self.target_name) or (name is not unknown_face_name):
+                    elif (self.target_name and name == self.target_name) or ((not self.target_name) and name != unknown_face_name):
                         target_reached = self.approach_target(video_frame, top,right, bottom, left)
                         break
 
@@ -199,7 +202,11 @@ class DroneControl(object):
 
     def get_battery(self):
         """ Get Tello battery state """
-        return self.tello.get_battery()[:2]
+        battery = self.tello.get_battery()
+        if battery:
+            return battery[:2]
+        else:
+            return False
 
     def load_face(self, file, name):
         """ Load and enroll a face from the File System """
@@ -428,6 +435,10 @@ def main():
         print(e)
 
 app = Flask(__name__) 
+app.config.from_object(__name__)
+
+CORS(app, resources={r'/*': {'origins': '*'}})
+
 drone = None
 
 @app.route('/') 
@@ -440,16 +451,17 @@ def video_gen():
     while True: 
         drone.loop()
         if drone.frame_available is not None:
-            cv2.imwrite('video_frame.jpg', drone.get_video_frame()) 
-        try:
+            _, image = cv2.imencode(".jpg", drone.get_video_frame())
             yield (b'--frame\r\n' 
-                b'Content-Type: image/jpeg\r\n\r\n' + open('video_frame.jpg', 'rb').read() + b'\r\n') 
-        except FileNotFoundError as e:
-            pass
+                b'Content-Type: image/jpeg\r\n\r\n' + image.tobytes() + b'\r\n') 
 
 @app.route('/static/<path:path>')
 def send_static(path):
     return send_from_directory('static', path)
+
+@app.route('/faces/<path:path>')
+def send_faces(path):
+    return send_from_directory('known_faces', path)
 
 @app.route('/video_feed') 
 def video_feed(): 
@@ -459,6 +471,35 @@ def video_feed():
 @app.route('/known_faces')
 def known_faces():
     return jsonify(filenames=os.listdir('known_faces/'))
+
+@app.route('/drone_status')
+def drone_status():
+    try:
+        battery = drone.get_battery()
+        if battery == False:
+            battery = 0
+    except AttributeError as e:
+        battery = 0
+    
+    try:
+        flying = drone.tello.get_height()
+        if flying:
+            flying = int(flying.split('d')[0]) > 0
+        else:
+            flying = False
+    except AttributeError as e:
+        flying = False
+
+    status = {
+        'for_back_velocity': drone.for_back_velocity,
+        'up_down_velocity': drone.up_down_velocity,
+        'left_right_velocity': drone.left_right_velocity,
+        'yaw_velocity': drone.yaw_velocity,
+        'battery': battery,
+        'flying': flying
+    }
+
+    return jsonify(status)
 
 @app.route('/drone_command', methods=['POST'])
 def drone_command():
@@ -486,8 +527,8 @@ def drone_command():
         drone.set_enroll_mode(data['enroll_mode'])
     if 'target_name' in data:
         drone.set_target_name(data['target_name'])
-    
-    return Response(status=200)
+
+    return redirect(url_for('drone_status'))
 
 if __name__ == '__main__': 
     drone = DroneControl()

@@ -12,6 +12,8 @@
     <button id="toggle_override">Toggle Override</button>
     <button id="toggle_enroll">Toggle Enroll</button>
 
+    <div id="faces"></div>
+
     <script>
       var override = false
       var enroll = false
@@ -19,6 +21,8 @@
       var v_yaw_pitch = 100
 
       $(document).ready(function() {
+        loadFaces()
+
         $('#take_off').click(function(e){
           sendCommand({
             command: 'take_off'
@@ -102,6 +106,20 @@
           dataType: "json",
           success: function(result) {
             console.log("ACK")
+          }
+        })
+      }
+
+      function loadFaces() {
+        $.ajax({
+          type: "GET",
+          url: "/known_faces",
+          success: function(result) {
+            filenames = result.filenames
+
+            filenames.forEach(filename => {
+              $("#faces").append('<img src="/faces/'  + filename + '"/>')
+            })
           }
         })
       }
